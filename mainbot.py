@@ -13,6 +13,12 @@ from aiogram.types import BotCommand
 from aiogram.dispatcher.filters import Text
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
+import re
+def extract_number(filename):
+    s = re.findall(r'\d+', filename)
+    return int(s[0]) if s else -1
+
+
 job_dir = 'Job'
 json_dir = os.path.join(job_dir, 'downloads_json')
 vcf_dir = os.path.join(job_dir, 'phone_number_processing')
@@ -129,7 +135,8 @@ async def process_accept_job(callback_query: types.CallbackQuery, state: FSMCont
         used_files = []
 
     vcf_files = [f for f in os.listdir(vcf_dir) if os.path.isfile(os.path.join(vcf_dir, f))
-                 and f.endswith('.vcf') and f not in used_files]
+                and f.endswith('.vcf') and f not in used_files]
+    vcf_files.sort(key=extract_number)
 
     if vcf_files:
         vcf_file_to_send = vcf_files[0]
@@ -259,12 +266,12 @@ async def process_documents(documents, message):
     total_files = (len(unique_numbers) - 1) // 201 + 1
     digits = len(str(total_files))
 
-    for i, chunk in enumerate([list(unique_numbers)[j:j+201] for j in range(0, len(unique_numbers), 201)]):
-        file_number = str(i + 1).zfill(digits)
-        vcf_filename = os.path.join(vcf_dir, f'contacts{file_number}.vcf')
+    for file_number in range(total_files):
+        vcf_filename = os.path.join(vcf_dir, f'contacts{file_number+1}.vcf')
         with open(vcf_filename, 'w', encoding='utf-8') as vcf_file:
-            for index, number in enumerate(chunk):
-                vcf_file.write(f'BEGIN:VCARD\nVERSION:3.0\nN:;Number{index};;;\nFN:Number{index}\nTEL;TYPE=CELL:{number}\nEND:VCARD\n')
+            for index, number in enumerate(list(unique_numbers)[file_number*200:(file_number+1)*200]):
+                contact_name = f'Number{index}'
+                vcf_file.write(f'BEGIN:VCARD\nVERSION:3.0\nN:;{contact_name};;;\nFN:{contact_name}\nTEL;TYPE=CELL:{number}\nEND:VCARD\n')
                 used_numbers.append(number)
 
     used_files_log_path = os.path.join(vcf_dir, 'used_numbers.txt')
